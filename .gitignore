@@ -6,3 +6,4 @@
 *.cubin
 *.fatbin
 *.out
+build/
