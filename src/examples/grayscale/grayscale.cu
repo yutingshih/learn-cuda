@@ -23,12 +23,12 @@ void grayscale(uint8_t* data, size_t size) {
     cudaFree(_data);
 }
 
-int main() {
+int main(int argc, const char* argv[]) {
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <image_path>" << std::endl;
         return -1;
     }
-    cv::Mat img = cv::imread(argv[1], cv::IMRAD_COLOR);
+    cv::Mat img = cv::imread(argv[1], cv::IMREAD_COLOR);
     if (img.empty()) {
         std::cerr << "Could not read the image: " << argv[1] << std::endl;
         return -1;
