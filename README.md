@@ -7,7 +7,7 @@ A cellection of CUDA code examples and notes to learn CUDA programming.
 - [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads)
 - [NVIDIA Driver](https://www.nvidia.com/Download/index.aspx)
 - [GNU Compiler Collection (GCC)](https://gcc.gnu.org/)
-- [GNU Make](https://www.gnu.org/software/make/)
+- [GNU Make](https://www.gnu.org/software/make/) or [Ninja](https://ninja-build.org/)
 - [CMake](https://cmake.org/)
 - [OpenCV](https://opencv.org/)
 
