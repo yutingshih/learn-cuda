@@ -11,6 +11,34 @@ A cellection of CUDA code examples and notes to learn CUDA programming.
 - [CMake](https://cmake.org/)
 - [OpenCV](https://opencv.org/)
 
+## Getting Started
+
+Start and run a Docker container with neccessary libraries and tools:
+
+```shell
+./scripts/docker.sh build
+./scripts/docker.sh run
+```
+
+Compile the source code:
+
+```shell
+cmake -B build -G Ninja
+cmake --build build
+```
+
+Executable the binary or profile with [Nsight Systems](https://developer.nvidia.com/nsight-systems)
+
+```shell
+# execute directly
+./build/vecadd
+
+# profile with Nsight Systems
+nsys -o report/vecadd ./build/vecadd
+```
+
+You may need to download [Nsight Systems Host](https://developer.nvidia.com/nsight-systems/get-started) (Windows/Linux/macOS are available) on your own computer to visualize the profiling report.
+
 ## Additional Resources
 
 - [CUDA C++ Programming Guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html)
