@@ -13,6 +13,7 @@ run() {
         -it \
         --rm \
         --gpus all \
+        --name $IMAGE \
         --mount type=bind,src=$PROJ_DIR,dst=$WORK_DIR \
         -w $WORK_DIR \
         $IMAGE
