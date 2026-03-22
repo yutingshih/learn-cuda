@@ -1,4 +1,5 @@
 #include "bench.cuh"
+#include "kernels/gemm_coalescing.cuh"
 #include "kernels/gemm_cpu.hpp"
 #include "kernels/gemm_naive.cuh"
 #include "kernels/sgemm_cublas.cuh"
@@ -13,6 +14,8 @@ int main()
     std::printf("GEMM Optimization Benchmark: M=%d, N=%d, K=%d\n", M, N, K);
 
     bench_cuda<float>(gemm_naive<float>, gemm_cpu, M, N, K, iter, "Naive");
+    bench_cuda<float>(gemm_coalescing<float>, gemm_cpu, M, N, K, iter,
+                      "Coalescing");
     bench_cuda<float>(sgemm_cublas, gemm_cpu, M, N, K, iter, "cuBLAS");
 
     return 0;
