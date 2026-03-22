@@ -1,5 +1,5 @@
-#ifndef SGEMM_CUBLAS_H
-#define SGEMM_CUBLAS_H
+#ifndef SGEMM_CUBLAS_CUH
+#define SGEMM_CUBLAS_CUH
 
 #include <cublas_v2.h>
 
@@ -19,4 +19,4 @@ void sgemm_cublas(const float *a,
     cublasDestroy(handle);
 }
 
-#endif  // SGEMM_CUBLAS_H
+#endif  // SGEMM_CUBLAS_CUH

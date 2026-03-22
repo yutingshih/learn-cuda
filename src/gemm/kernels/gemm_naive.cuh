@@ -1,5 +1,5 @@
-#ifndef SGEMM_NAIVE_H
-#define SGEMM_NAIVE_H
+#ifndef GEMM_NAIVE_CUH
+#define GEMM_NAIVE_CUH
 
 #include <cuda_runtime.h>
 
@@ -43,4 +43,4 @@ void gemm_naive(const T *a,
         <<<grid_size, block_size>>>(a, b, c, m, n, k, alpha, beta);
 }
 
-#endif  // SGEMM_NAIVE_H
+#endif  // GEMM_NAIVE_CUH

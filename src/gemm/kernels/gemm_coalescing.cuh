@@ -1,5 +1,5 @@
-#ifndef SGEMM_COALESCING_H
-#define SGEMM_COALESCING_H
+#ifndef GEMM_COALESCING_CUH
+#define GEMM_COALESCING_CUH
 
 #include <cuda_runtime.h>
 
@@ -42,4 +42,4 @@ void gemm_coalescing(const T *a,
     _gemm_coalescing<<<grid_size, block_size>>>(a, b, c, m, n, k, alpha, beta);
 }
 
-#endif  // SGEMM_COALESCING_H
+#endif  // GEMM_COALESCING_CUH

@@ -1,5 +1,5 @@
-#ifndef SGEMM_CPU_H
-#define SGEMM_CPU_H
+#ifndef GEMM_CPU_HPP
+#define GEMM_CPU_HPP
 
 template <typename T = float, typename AccT = T>
 void gemm_cpu(const T *a,
@@ -23,4 +23,4 @@ void gemm_cpu(const T *a,
     }
 }
 
-#endif  // SGEMM_CPU_H
+#endif  // GEMM_CPU_HPP
