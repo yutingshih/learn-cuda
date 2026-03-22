@@ -3,17 +3,23 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 
-__global__ void _blur(uint8_t* out, const uint8_t* in, size_t rows, size_t cols,
-                      int ks) {
+__global__ void _blur(uint8_t *out,
+                      const uint8_t *in,
+                      size_t rows,
+                      size_t cols,
+                      int ks)
+{
     int r = threadIdx.y + blockIdx.y * blockDim.y;
     int c = threadIdx.x + blockIdx.x * blockDim.x;
-    if (r >= rows || c >= cols) return;
+    if (r >= rows || c >= cols)
+        return;
 
     for (int k = 0; k < 3; ++k) {
         int num = 0, val = 0;
         for (int i = r - ks / 2; i <= r + ks / 2; ++i) {
             for (int j = c - ks; j < c + ks; ++j) {
-                if (i < 0 || i >= rows || j < 0 || j >= cols) continue;
+                if (i < 0 || i >= rows || j < 0 || j >= cols)
+                    continue;
                 val += in[(i * cols + j) * 3 + k];
                 num++;
             }
@@ -22,7 +28,8 @@ __global__ void _blur(uint8_t* out, const uint8_t* in, size_t rows, size_t cols,
     }
 }
 
-void blur(uint8_t* data, size_t rows, size_t cols, int ks = 3, int bs = 32) {
+void blur(uint8_t *data, size_t rows, size_t cols, int ks = 3, int bs = 32)
+{
     uint8_t *_in, *_out;
     size_t size = rows * cols * 3 * sizeof(uint8_t);
     cudaMalloc(&_in, size);
@@ -36,7 +43,8 @@ void blur(uint8_t* data, size_t rows, size_t cols, int ks = 3, int bs = 32) {
     cudaFree(_out);
 }
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[])
+{
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <image_path>" << std::endl;
         return -1;
@@ -47,7 +55,7 @@ int main(int argc, const char* argv[]) {
         return -1;
     }
 
-    unsigned char* data = img.ptr<unsigned char>();
+    unsigned char *data = img.ptr<unsigned char>();
     blur(data, img.rows, img.cols);
 
     cv::imwrite("blurred.jpg", img);

@@ -2,7 +2,8 @@
 #include "kernels/gemm_cpu.hpp"
 #include "kernels/sgemm_cublas.cuh"
 
-int main() {
+int main()
+{
     const int M = 1024;
     const int N = 1024;
     const int K = 1024;

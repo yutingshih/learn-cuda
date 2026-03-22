@@ -20,9 +20,19 @@ Arguments:
     str: strides of heights and widths
     dil: dilation rate of heights and widths
 */
-void conv2d(double *I, double *K, double *O,
-    unsigned N, unsigned C, unsigned H, unsigned W,
-    unsigned M, unsigned E, unsigned F,
-    unsigned pad, unsigned str, unsigned dil);
+void conv2d(
+    double *I,
+    double *K,
+    double *O,
+    unsigned N,
+    unsigned C,
+    unsigned H,
+    unsigned W,
+    unsigned M,
+    unsigned E,
+    unsigned F,
+    unsigned pad,
+    unsigned str,
+    unsigned dil);
 
-#endif // CONV_H
+#endif  // CONV_H

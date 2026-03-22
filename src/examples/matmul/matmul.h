@@ -22,4 +22,4 @@ void matShow(float *M, int size) {
     puts("");
 }
 
-#endif // MATMUL_H
+#endif  // MATMUL_H

@@ -2,8 +2,15 @@
 #define SGEMM_CPU_H
 
 template <typename T = float, typename AccT = T>
-void gemm_cpu(
-    const T* a, const T* b, T* c, int m, int n, int k, AccT alpha, AccT beta) {
+void gemm_cpu(const T *a,
+              const T *b,
+              T *c,
+              int m,
+              int n,
+              int k,
+              AccT alpha,
+              AccT beta)
+{
     for (int x = 0; x < m; x++) {
         for (int y = 0; y < n; y++) {
             AccT sum = 0.0f;

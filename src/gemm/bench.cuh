@@ -11,10 +11,11 @@
 #define FUNC_NAME_WIDTH 10
 
 template <typename T, typename AccT = T>
-using gemm_fn = void (*)(const T*, const T*, T*, int, int, int, AccT, AccT);
+using gemm_fn = void (*)(const T *, const T *, T *, int, int, int, AccT, AccT);
 
 template <typename T>
-bool verify(const T* cpu_res, const T* gpu_res, int size) {
+bool verify(const T *cpu_res, const T *gpu_res, int size)
+{
     for (int i = 0; i < size; i++) {
         if (std::abs(cpu_res[i] - gpu_res[i]) > 1e-2) {
             std::cout << "Verification failed at index %d: " << i;
@@ -32,7 +33,8 @@ void bench_cpu(gemm_fn<T, AccT> gemm,
                int n,
                int k,
                const int iter,
-               const std::string& name) {
+               const std::string &name)
+{
     std::vector<T> a(m * k, 1.1f);
     std::vector<T> b(k * n, 2.2f);
     std::vector<T> c(m * n, 0.0f);
@@ -62,7 +64,8 @@ void bench_cuda(gemm_fn<T, AccT> gemm,
                 int n,
                 int k,
                 const int iter,
-                const std::string& name) {
+                const std::string &name)
+{
     std::vector<T> a(m * k, 1.1f);
     std::vector<T> b(k * n, 2.2f);
     std::vector<T> c_host(m * n, 0.0f);

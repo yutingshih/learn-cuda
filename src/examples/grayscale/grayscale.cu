@@ -1,7 +1,8 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 
-__global__ void _grayscale(uint8_t* data, size_t size) {
+__global__ void _grayscale(uint8_t *data, size_t size)
+{
     int i = threadIdx.x + blockDim.x * blockIdx.x;
     if (i < size / 3) {
         uint8_t r = data[i * 3];
@@ -12,8 +13,9 @@ __global__ void _grayscale(uint8_t* data, size_t size) {
     }
 }
 
-void grayscale(uint8_t* data, size_t size) {
-    uint8_t* _data = nullptr;
+void grayscale(uint8_t *data, size_t size)
+{
+    uint8_t *_data = nullptr;
     cudaMalloc(&_data, size);
     cudaMemcpy(_data, data, size, cudaMemcpyDefault);
     size_t threads = 32;
@@ -23,7 +25,8 @@ void grayscale(uint8_t* data, size_t size) {
     cudaFree(_data);
 }
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[])
+{
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <image_path>" << std::endl;
         return -1;
@@ -34,7 +37,7 @@ int main(int argc, const char* argv[]) {
         return -1;
     }
 
-    uint8_t* data = img.ptr<uint8_t>();
+    uint8_t *data = img.ptr<uint8_t>();
     size_t size = img.total() * img.elemSize();
     grayscale(data, size);
 

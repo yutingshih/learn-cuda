@@ -1,16 +1,16 @@
+#include <cuda.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <cuda.h>
-
 #include "matmul.h"
 
-__global__
-void _matMul(float *M, float *N, float *P, int size) {
+__global__ void _matMul(float *M, float *N, float *P, int size)
+{
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
 
-    if (i >= size || j >= size) return;
+    if (i >= size || j >= size)
+        return;
 
     float sum = 0.0;
     for (int k = 0; k < size; ++k) {
@@ -19,7 +19,8 @@ void _matMul(float *M, float *N, float *P, int size) {
     P[i * size + j] = sum;
 }
 
-void matMul(float *M, float *N, float *P, int size) {
+void matMul(float *M, float *N, float *P, int size)
+{
     int nbytes = size * size * sizeof(float);
     float *_M, *_N, *_P;
     cudaMalloc(&_M, nbytes);
@@ -41,12 +42,13 @@ void matMul(float *M, float *N, float *P, int size) {
     cudaFree(_P);
 }
 
-int main() {
+int main()
+{
     const int size = 4;
     int nbytes = size * size * sizeof(float);
-    float *M = (float *)malloc(nbytes);
-    float *N = (float *)malloc(nbytes);
-    float *P = (float *)malloc(nbytes);
+    float *M = (float *) malloc(nbytes);
+    float *N = (float *) malloc(nbytes);
+    float *P = (float *) malloc(nbytes);
 
     matInit(M, size);
     matInit(N, size);

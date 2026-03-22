@@ -3,15 +3,17 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 
-__global__ void _invert(uint8_t* data, size_t size) {
+__global__ void _invert(uint8_t *data, size_t size)
+{
     size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < size) {
         data[idx] = 255 - data[idx];
     }
 }
 
-void invert(uint8_t* data, size_t size) {
-    uint8_t* _data;
+void invert(uint8_t *data, size_t size)
+{
+    uint8_t *_data;
     cudaMalloc(&_data, size);
     cudaMemcpy(_data, data, size, cudaMemcpyDefault);
     size_t block_size = 32;
@@ -21,7 +23,8 @@ void invert(uint8_t* data, size_t size) {
     cudaFree(_data);
 }
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[])
+{
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <image_path>" << std::endl;
         return -1;
@@ -32,7 +35,7 @@ int main(int argc, const char* argv[]) {
         return -1;
     }
 
-    uint8_t* data = img.ptr<uint8_t>(0);
+    uint8_t *data = img.ptr<uint8_t>(0);
     size_t size = img.total() * img.elemSize();
     invert(data, size);
 

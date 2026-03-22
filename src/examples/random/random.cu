@@ -1,9 +1,10 @@
-#include <iostream>
-
 #include <cuda.h>
 #include <curand_kernel.h>
 
-__global__ void randomNumber(float *x, int n) {
+#include <iostream>
+
+__global__ void randomNumber(float *x, int n)
+{
     curandState state;
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     if (tid < n) {
@@ -13,13 +14,15 @@ __global__ void randomNumber(float *x, int n) {
     }
 }
 
-void printArray(float *a, int n) {
+void printArray(float *a, int n)
+{
     for (int i = 0; i < n; i++)
         std::cout << a[i] << " ";
     std::cout << std::endl;
 }
 
-int main() {
+int main()
+{
     int nElem = 10;
     int nBytes = sizeof(float) * nElem;
     float *_x;
@@ -27,7 +30,7 @@ int main() {
 
     randomNumber<<<1, 10>>>(_x, nElem);
 
-    float *x = (float *)malloc(nBytes);
+    float *x = (float *) malloc(nBytes);
     cudaMemcpy(x, _x, nBytes, cudaMemcpyDeviceToHost);
     printArray(x, nElem);
     cudaFree(_x);
