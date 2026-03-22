@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(learn-cuda LANGUAGES C CXX CUDA)
 
 set(CMAKE_CUDA_ARCHITECTURES native)
+find_package(CUDAToolkit REQUIRED)
 
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
@@ -25,3 +26,7 @@ target_link_libraries(grayscale ${OpenCV_LIBS})
 
 add_executable(blur src/examples/blur/blur.cu)
 target_link_libraries(blur ${OpenCV_LIBS})
+
+add_executable(gemm src/gemm/main.cu)
+target_include_directories(gemm PRIVATE src/gemm)
+target_link_libraries(gemm PRIVATE CUDA::cublas)
