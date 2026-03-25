@@ -38,7 +38,7 @@ void gemm_naive(const T *a,
                 AccT beta)
 {
     dim3 block_size(32, 32);
-    dim3 grid_size(1 + (n - 1) / block_size.x, 1 + (m - 1) / block_size.y);
+    dim3 grid_size(1 + (m - 1) / block_size.x, 1 + (n - 1) / block_size.y);
     _gemm_naive<T, AccT>
         <<<grid_size, block_size>>>(a, b, c, m, n, k, alpha, beta);
 }
