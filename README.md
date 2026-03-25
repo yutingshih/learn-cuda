@@ -1,6 +1,6 @@
 # Learn CUDA
 
-A cellection of CUDA code examples and notes to learn CUDA programming.
+A collection of CUDA code examples and notes to learn CUDA programming.
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ A cellection of CUDA code examples and notes to learn CUDA programming.
 
 ## Getting Started
 
-Start and run a Docker container with neccessary libraries and tools:
+Start and run a Docker container with necessary libraries and tools:
 
 ```shell
 ./scripts/docker.sh build
@@ -27,7 +27,7 @@ cmake -B build -G Ninja
 cmake --build build
 ```
 
-Executable the binary or profile with [Nsight Systems](https://developer.nvidia.com/nsight-systems)
+Execute the binary or profile with [Nsight Systems](https://developer.nvidia.com/nsight-systems)
 
 ```shell
 # execute directly
@@ -35,6 +35,18 @@ Executable the binary or profile with [Nsight Systems](https://developer.nvidia.
 
 # profile with Nsight Systems
 nsys -o report/vecadd ./build/vecadd
+```
+
+## Benchmark and Plotting
+
+You can run GEMM optimization benchmarks and plot the results:
+
+```shell
+# run GEMM benchmark and save to result.csv
+./build/gemm
+
+# plot latency and performance
+uv run utils/plot.py data/result.csv data/images
 ```
 
 You may need to download [Nsight Systems Host](https://developer.nvidia.com/nsight-systems/get-started) (Windows/Linux/macOS are available) on your own computer to visualize the profiling report.

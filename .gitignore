@@ -7,3 +7,6 @@
 *.fatbin
 *.out
 build/
+data/
+.python-version
+uv.lock

@@ -3,22 +3,19 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
-#include <iomanip>
 #include <iostream>
 #include <string>
 #include <vector>
-
-#define FUNC_NAME_WIDTH 10
 
 template <typename T, typename AccT = T>
 using gemm_fn = void (*)(const T *, const T *, T *, int, int, int, AccT, AccT);
 
 template <typename T>
-bool verify(const T *cpu_res, const T *gpu_res, int size)
+bool verify(const T *cpu_res, const T *gpu_res, int size, float tol = 1e-1)
 {
     for (int i = 0; i < size; i++) {
-        if (std::abs(cpu_res[i] - gpu_res[i]) > 1e-2) {
-            std::cout << "Verification failed at index %d: " << i;
+        if (std::fabs(cpu_res[i] - gpu_res[i]) > tol) {
+            std::cout << "Verification failed at index " << i << ": ";
             std::cout << "CPU=" << cpu_res[i] << ", ";
             std::cout << "GPU=" << cpu_res[i] << std::endl;
             return false;
@@ -29,11 +26,12 @@ bool verify(const T *cpu_res, const T *gpu_res, int size)
 
 template <typename T, typename AccT = T>
 void bench_cpu(gemm_fn<T, AccT> gemm,
-               int m,
-               int n,
-               int k,
+               const int m,
+               const int n,
+               const int k,
                const int iter,
-               const std::string &name)
+               float *elapsed = nullptr,
+               float *gflops = nullptr)
 {
     std::vector<T> a(m * k, 1.1f);
     std::vector<T> b(k * n, 2.2f);
@@ -50,21 +48,22 @@ void bench_cpu(gemm_fn<T, AccT> gemm,
     auto stop = std::chrono::high_resolution_clock::now();
 
     std::chrono::duration<float, std::milli> duration = stop - start;
-    float ms = duration.count() / iter;
-    double gflops = (2.0 * m * n * k * 1e-9) / (ms * 1e-3);
-
-    std::cout << "[" << std::setw(FUNC_NAME_WIDTH) << name.c_str() << "] ";
-    std::printf("time = %f ms, perf = %f GFLOPS\n", ms, gflops);
+    if (elapsed && gflops) {
+        *elapsed = duration.count() / iter;
+        *gflops = (2.0 * m * n * k * 1e-9) / (*elapsed * 1e-3);
+    }
 }
 
 template <typename T, typename AccT = T>
 void bench_cuda(gemm_fn<T, AccT> gemm,
                 gemm_fn<T, AccT> gemm_ref,
-                int m,
-                int n,
-                int k,
+                const int m,
+                const int n,
+                const int k,
                 const int iter,
-                const std::string &name)
+                bool *passed = nullptr,
+                float *elapsed = nullptr,
+                float *gflops = nullptr)
 {
     std::vector<T> a(m * k, 1.1f);
     std::vector<T> b(k * n, 2.2f);
@@ -98,17 +97,16 @@ void bench_cuda(gemm_fn<T, AccT> gemm,
     cudaEventRecord(stop);
     cudaDeviceSynchronize();
 
-    float ms = 0.0f;
-    cudaEventElapsedTime(&ms, start, stop);
-    ms /= iter;
-
+    if (elapsed && gflops) {
+        *elapsed = 0.0f;
+        cudaEventElapsedTime(elapsed, start, stop);
+        *elapsed /= iter;
+        *gflops = (2.0 * m * n * k * 1e-9) / (*elapsed * 1e-3);
+    }
     cudaMemcpy(c_host.data(), _c, m * n * sizeof(T), cudaMemcpyDeviceToHost);
-    bool ok = verify(c_ref.data(), c_host.data(), m * n);
-
-    double gflops = (2.0 * m * n * k * 1e-9) / (ms * 1e-3);
-    std::cout << "[" << std::setw(FUNC_NAME_WIDTH) << name.c_str() << "] ";
-    std::printf("time = %f ms, perf = %f GFLOPS, status = %s\n", ms, gflops,
-                ok ? "PASS" : "FAIL");
+    if (passed) {
+        *passed = verify(c_ref.data(), c_host.data(), m * n);
+    }
 
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
