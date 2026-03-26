@@ -6,6 +6,7 @@
 #include "kernels/gemm_coalescing.cuh"
 #include "kernels/gemm_cpu.hpp"
 #include "kernels/gemm_naive.cuh"
+#include "kernels/gemm_shared_mem.cuh"
 #include "kernels/sgemm_cublas.cuh"
 
 void benchmarking(const int M,
@@ -17,6 +18,7 @@ void benchmarking(const int M,
     static std::pair<std::string, gemm_fn<float>> func[] = {
         {"Naive", gemm_naive<float>},
         {"Coalesced", gemm_coalescing<float>},
+        {"SharedMem", gemm_shared_mem<float>},
         {"cuBLAS", sgemm_cublas},
     };
 
