@@ -39,7 +39,8 @@ void gemm_coalescing(const T *a,
 {
     dim3 block_size(32, 32);
     dim3 grid_size(1 + (n - 1) / block_size.x, 1 + (m - 1) / block_size.y);
-    _gemm_coalescing<<<grid_size, block_size>>>(a, b, c, m, n, k, alpha, beta);
+    _gemm_coalescing<T, AccT>
+        <<<grid_size, block_size>>>(a, b, c, m, n, k, alpha, beta);
 }
 
 #endif  // GEMM_COALESCING_CUH
