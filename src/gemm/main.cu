@@ -1,5 +1,6 @@
 #include <fstream>
 #include <iostream>
+#include <utility>
 
 #include "bench.cuh"
 #include "kernels/gemm_coalescing.cuh"
@@ -24,26 +25,24 @@ void benchmarking(const int M,
                   const int iter = 10,
                   const std::string &filename = "result.csv")
 {
+    static std::pair<std::string, gemm_fn<float>> func[] = {
+        {"Naive", gemm_naive<float>},
+        {"Coalesced", gemm_coalescing<float>},
+        {"cuBLAS", sgemm_cublas},
+    };
+
     std::printf("GEMM Optimization Benchmark: M=%d, N=%d, K=%d\n", M, N, K);
     float time_ms = 0.0, gflops = 0.0;
     bool passed = false;
     std::ofstream out(filename);
     out << "name,time(ms),perf(GFLOPS)" << std::endl;
 
-    bench_cuda<float>(gemm_naive<float>, gemm_cpu, M, N, K, iter, &passed,
-                      &time_ms, &gflops);
-    print_result("Naive", time_ms, gflops, passed);
-    out << "Naive" << "," << time_ms << "," << gflops << std::endl;
-
-    bench_cuda<float>(gemm_coalescing<float>, gemm_cpu, M, N, K, iter, &passed,
-                      &time_ms, &gflops);
-    print_result("Coalesced", time_ms, gflops, passed);
-    out << "Coalesced" << "," << time_ms << "," << gflops << std::endl;
-
-    bench_cuda<float>(sgemm_cublas, gemm_cpu, M, N, K, iter, &passed, &time_ms,
-                      &gflops);
-    print_result("cuBLAS", time_ms, gflops, passed);
-    out << "cuBLAS" << "," << time_ms << "," << gflops << std::endl;
+    for (const auto &fn : func) {
+        bench_cuda<float>(fn.second, gemm_cpu, M, N, K, iter, &passed, &time_ms,
+                          &gflops);
+        print_result(fn.first, time_ms, gflops, passed);
+        out << fn.first << "," << time_ms << "," << gflops << std::endl;
+    }
 
     out.close();
 }
