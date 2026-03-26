@@ -8,17 +8,6 @@
 #include "kernels/gemm_naive.cuh"
 #include "kernels/sgemm_cublas.cuh"
 
-#define FUNC_NAME_WIDTH 14
-
-static inline void print_result(const std::string &name,
-                                float time_ms,
-                                float gflops,
-                                bool passed)
-{
-    std::printf("[%s] time = %f ms, perf = %f GFLOPS => %s\n", name.c_str(),
-                time_ms, gflops, passed ? "Pass" : "Fail");
-}
-
 void benchmarking(const int M,
                   const int N,
                   const int K,
@@ -32,19 +21,18 @@ void benchmarking(const int M,
     };
 
     std::printf("GEMM Optimization Benchmark: M=%d, N=%d, K=%d\n", M, N, K);
-    float time_ms = 0.0, gflops = 0.0;
-    bool passed = false;
-    std::ofstream out(filename);
-    out << "name,time(ms),perf(GFLOPS)" << std::endl;
+    BenchmarkResult res;
+    std::ofstream file(filename);
+    file << "name,time(ms),perf(GFLOPS)" << std::endl;
 
     for (const auto &fn : func) {
-        bench_cuda<float>(fn.second, gemm_cpu, M, N, K, iter, &passed, &time_ms,
-                          &gflops);
-        print_result(fn.first, time_ms, gflops, passed);
-        out << fn.first << "," << time_ms << "," << gflops << std::endl;
+        bench_cuda<float>(fn.second, gemm_cpu, M, N, K, iter, &res);
+        res.name = fn.first;
+        std::cout << res << std::endl;
+        file << fn.first << "," << res.time_ms << "," << res.gflops << "\n";
     }
 
-    out.close();
+    file.close();
 }
 
 int main()

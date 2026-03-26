@@ -10,6 +10,22 @@
 template <typename T, typename AccT = T>
 using gemm_fn = void (*)(const T *, const T *, T *, int, int, int, AccT, AccT);
 
+struct BenchmarkResult {
+    std::string name;
+    bool passed;
+    float time_ms;
+    float gflops;
+};
+
+std::ostream &operator<<(std::ostream &os, const BenchmarkResult &res)
+{
+    os << "[" << res.name << "] ";
+    os << "time = " << res.time_ms << " ms, ";
+    os << "perf = " << res.gflops << " GFLOPS, ";
+    os << "=> " << (res.passed ? "Passed" : "Failed");
+    return os;
+}
+
 template <typename T>
 bool verify(const T *cpu_res, const T *gpu_res, int size, float tol = 1e-1)
 {
@@ -30,8 +46,7 @@ void bench_cpu(gemm_fn<T, AccT> gemm,
                const int n,
                const int k,
                const int iter,
-               float *elapsed = nullptr,
-               float *gflops = nullptr)
+               BenchmarkResult *result = nullptr)
 {
     std::vector<T> a(m * k, 1.1f);
     std::vector<T> b(k * n, 2.2f);
@@ -48,9 +63,10 @@ void bench_cpu(gemm_fn<T, AccT> gemm,
     auto stop = std::chrono::high_resolution_clock::now();
 
     std::chrono::duration<float, std::milli> duration = stop - start;
-    if (elapsed && gflops) {
-        *elapsed = duration.count() / iter;
-        *gflops = (2.0 * m * n * k * 1e-9) / (*elapsed * 1e-3);
+    if (result) {
+        result->time_ms = duration.count() / iter;
+        result->gflops = (2.0 * m * n * k * 1e-9) / (result->time_ms * 1e-3);
+        result->passed = true;
     }
 }
 
@@ -61,9 +77,7 @@ void bench_cuda(gemm_fn<T, AccT> gemm,
                 const int n,
                 const int k,
                 const int iter,
-                bool *passed = nullptr,
-                float *elapsed = nullptr,
-                float *gflops = nullptr)
+                BenchmarkResult *result = nullptr)
 {
     std::vector<T> a(m * k, 1.1f);
     std::vector<T> b(k * n, 2.2f);
@@ -97,15 +111,13 @@ void bench_cuda(gemm_fn<T, AccT> gemm,
     cudaEventRecord(stop);
     cudaDeviceSynchronize();
 
-    if (elapsed && gflops) {
-        *elapsed = 0.0f;
-        cudaEventElapsedTime(elapsed, start, stop);
-        *elapsed /= iter;
-        *gflops = (2.0 * m * n * k * 1e-9) / (*elapsed * 1e-3);
-    }
     cudaMemcpy(c_host.data(), _c, m * n * sizeof(T), cudaMemcpyDeviceToHost);
-    if (passed) {
-        *passed = verify(c_ref.data(), c_host.data(), m * n);
+
+    if (result) {
+        cudaEventElapsedTime(&result->time_ms, start, stop);
+        result->time_ms /= iter;
+        result->gflops = (2.0 * m * n * k * 1e-9) / (result->time_ms * 1e-3);
+        result->passed = verify(c_ref.data(), c_host.data(), m * n);
     }
 
     cudaEventDestroy(start);
