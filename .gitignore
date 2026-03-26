@@ -10,3 +10,4 @@ build/
 data/
 .python-version
 uv.lock
+.venv

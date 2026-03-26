@@ -9,3 +9,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     libopencv-dev \
     ninja-build \
     tree
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
