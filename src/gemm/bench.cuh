@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <iostream>
 #include <string>
@@ -10,11 +11,34 @@
 template <typename T, typename AccT = T>
 using gemm_fn = void (*)(const T *, const T *, T *, int, int, int, AccT, AccT);
 
+template <typename T, typename AccT = T>
+using gemmsb_fn = void (*)(const T *,
+                           const T *,
+                           T *,
+                           int,
+                           int,
+                           int,
+                           int,
+                           long long int,
+                           long long int,
+                           long long int,
+                           AccT,
+                           AccT);
+
 struct BenchmarkResult {
     std::string name;
-    bool passed;
     float time_ms;
     float gflops;
+    uint64_t num_ops;
+    bool passed;
+
+    void set_result(float time_ms, uint64_t num_ops, bool passed = true)
+    {
+        this->time_ms = time_ms;
+        this->num_ops = num_ops;
+        this->gflops = (num_ops * 1e-9) / (time_ms * 1e-3);
+        this->passed = passed;
+    }
 };
 
 std::ostream &operator<<(std::ostream &os, const BenchmarkResult &res)
@@ -27,13 +51,15 @@ std::ostream &operator<<(std::ostream &os, const BenchmarkResult &res)
 }
 
 template <typename T>
-bool verify(const T *cpu_res, const T *gpu_res, int size, float tol = 1e-1)
+bool verify(const T *res, const T *ref, int size, float tol = 1e-1)
 {
     for (int i = 0; i < size; i++) {
-        if (std::fabs(cpu_res[i] - gpu_res[i]) > tol) {
+        float diff = std::fabs(res[i] - ref[i]);
+        float max_val = std::fmax(std::fabs(res[i]), std::fabs(ref[i]));
+        if (max_val > 0.0f && (diff / max_val) > tol) {
             std::cout << "Verification failed at index " << i << ": ";
-            std::cout << "CPU=" << cpu_res[i] << ", ";
-            std::cout << "GPU=" << cpu_res[i] << std::endl;
+            std::cout << "res=" << res[i] << ", ";
+            std::cout << "ref=" << ref[i] << std::endl;
             return false;
         }
     }
@@ -41,83 +67,167 @@ bool verify(const T *cpu_res, const T *gpu_res, int size, float tol = 1e-1)
 }
 
 template <typename T, typename AccT = T>
-void bench_cpu(gemm_fn<T, AccT> gemm,
-               const int m,
-               const int n,
-               const int k,
+void bench_cpu(gemm_fn<T, AccT> func,
+               const int M,
+               const int N,
+               const int K,
                const int iter,
                BenchmarkResult *result = nullptr)
 {
-    std::vector<T> a(m * k, 1.1f);
-    std::vector<T> b(k * n, 2.2f);
-    std::vector<T> c(m * n, 0.0f);
+    std::vector<T> a(M * K, 1.1f);
+    std::vector<T> b(K * N, 2.2f);
+    std::vector<T> c(M * N, 0.0f);
     AccT alpha = 1.0f, beta = 0.0f;
 
     // Warm up
-    gemm(a.data(), b.data(), c.data(), m, n, k, alpha, beta);
+    func(a.data(), b.data(), c.data(), M, N, K, alpha, beta);
 
     auto start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < iter; i++) {
-        gemm(a.data(), b.data(), c.data(), m, n, k, alpha, beta);
+        func(a.data(), b.data(), c.data(), M, N, K, alpha, beta);
     }
     auto stop = std::chrono::high_resolution_clock::now();
 
     std::chrono::duration<float, std::milli> duration = stop - start;
     if (result) {
-        result->time_ms = duration.count() / iter;
-        result->gflops = (2.0 * m * n * k * 1e-9) / (result->time_ms * 1e-3);
-        result->passed = true;
+        result->set_result(duration.count() / iter, 2.0 * M * N * (K + 1));
     }
 }
 
 template <typename T, typename AccT = T>
-void bench_cuda(gemm_fn<T, AccT> gemm,
-                gemm_fn<T, AccT> gemm_ref,
-                const int m,
-                const int n,
-                const int k,
+void bench_cpu(gemmsb_fn<T, AccT> func,
+               const int B,
+               const int M,
+               const int N,
+               const int K,
+               const uint64_t str_a,
+               const uint64_t str_b,
+               const uint64_t str_c,
+               const int iter,
+               BenchmarkResult *result = nullptr)
+{
+    std::vector<T> a(B * M * K, 1.1f);
+    std::vector<T> b(B * K * N, 2.2f);
+    std::vector<T> c(B * M * N, 0.0f);
+    AccT alpha = 1.0f, beta = 0.0f;
+
+    // Warm up
+    func(a.data(), b.data(), c.data(), B, M, N, K, str_a, str_b, str_c, alpha,
+         beta);
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iter; i++) {
+        func(a.data(), b.data(), c.data(), B, M, N, K, str_a, str_b, str_c,
+             alpha, beta);
+    }
+    auto stop = std::chrono::high_resolution_clock::now();
+
+    std::chrono::duration<float, std::milli> duration = stop - start;
+    if (result) {
+        result->set_result(duration.count() / iter, 2.0 * B * M * N * (K + 1));
+    }
+}
+
+template <typename T, typename AccT = T>
+void bench_cuda(gemm_fn<T, AccT> func,
+                const int M,
+                const int N,
+                const int K,
                 const int iter,
                 BenchmarkResult *result = nullptr)
 {
-    std::vector<T> a(m * k, 1.1f);
-    std::vector<T> b(k * n, 2.2f);
-    std::vector<T> c_host(m * n, 0.0f);
-    std::vector<T> c_ref(m * n, 0.0f);
+    std::vector<T> a(M * K, 1.1f);
+    std::vector<T> b(K * N, 2.2f);
+    std::vector<T> c(M * N, 0.0f);
     AccT alpha = 1.0f, beta = 0.0f;
 
-    gemm_ref(a.data(), b.data(), c_ref.data(), m, n, k, alpha, beta);
-
     T *_a, *_b, *_c;
-    cudaMalloc(&_a, m * k * sizeof(T));
-    cudaMalloc(&_b, k * n * sizeof(T));
-    cudaMalloc(&_c, m * n * sizeof(T));
+    cudaMalloc(&_a, M * K * sizeof(T));
+    cudaMalloc(&_b, K * N * sizeof(T));
+    cudaMalloc(&_c, M * N * sizeof(T));
 
-    cudaMemcpy(_a, a.data(), m * k * sizeof(T), cudaMemcpyHostToDevice);
-    cudaMemcpy(_b, b.data(), k * n * sizeof(T), cudaMemcpyHostToDevice);
-    cudaMemset(_c, 0, m * n * sizeof(T));
+    cudaMemcpy(_a, a.data(), M * K * sizeof(T), cudaMemcpyDefault);
+    cudaMemcpy(_b, b.data(), K * N * sizeof(T), cudaMemcpyDefault);
+    cudaMemset(_c, 0, M * N * sizeof(T));
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
     // Warm up
-    gemm(_a, _b, _c, m, n, k, alpha, beta);
+    func(_a, _b, _c, M, N, K, alpha, beta);
     cudaDeviceSynchronize();
 
     cudaEventRecord(start);
     for (int i = 0; i < iter; i++) {
-        gemm(_a, _b, _c, m, n, k, alpha, beta);
+        func(_a, _b, _c, M, N, K, alpha, beta);
     }
     cudaEventRecord(stop);
     cudaDeviceSynchronize();
 
-    cudaMemcpy(c_host.data(), _c, m * n * sizeof(T), cudaMemcpyDeviceToHost);
+    cudaMemcpy(c.data(), _c, M * N * sizeof(T), cudaMemcpyDefault);
 
     if (result) {
-        cudaEventElapsedTime(&result->time_ms, start, stop);
-        result->time_ms /= iter;
-        result->gflops = (2.0 * m * n * k * 1e-9) / (result->time_ms * 1e-3);
-        result->passed = verify(c_ref.data(), c_host.data(), m * n);
+        float time_ms;
+        cudaEventElapsedTime(&time_ms, start, stop);
+        result->set_result(time_ms / iter, 2.0 * M * N * (K + 1));
+    }
+
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+    cudaFree(_a);
+    cudaFree(_b);
+    cudaFree(_c);
+}
+
+template <typename T, typename AccT>
+void bench_cuda(gemmsb_fn<T, AccT> func,
+                const int B,
+                const int M,
+                const int N,
+                const int K,
+                const uint64_t str_a,
+                const uint64_t str_b,
+                const uint64_t str_c,
+                const int iter,
+                BenchmarkResult *result = nullptr)
+{
+    std::vector<T> a(B * M * K, 1.1f);
+    std::vector<T> b(B * K * N, 2.2f);
+    std::vector<T> c(B * M * N, 0.0f);
+    AccT alpha = 1.0f, beta = 0.0f;
+
+    T *_a, *_b, *_c;
+    cudaMalloc(&_a, B * M * K * sizeof(T));
+    cudaMalloc(&_b, B * K * N * sizeof(T));
+    cudaMalloc(&_c, B * M * N * sizeof(T));
+
+    cudaMemcpy(_a, a.data(), B * M * K * sizeof(T), cudaMemcpyDefault);
+    cudaMemcpy(_b, b.data(), B * K * N * sizeof(T), cudaMemcpyDefault);
+    cudaMemset(_c, 0, B * M * N * sizeof(T));
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    // Warm up
+    func(_a, _b, _c, B, M, N, K, str_a, str_b, str_c, alpha, beta);
+    cudaDeviceSynchronize();
+
+    cudaEventRecord(start);
+    for (int i = 0; i < iter; i++) {
+        func(_a, _b, _c, B, M, N, K, str_a, str_b, str_c, alpha, beta);
+    }
+    cudaEventRecord(stop);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(c.data(), _c, B * M * N * (K + 1) * sizeof(T),
+               cudaMemcpyDeviceToHost);
+
+    if (result) {
+        float time_ms;
+        cudaEventElapsedTime(&time_ms, start, stop);
+        result->set_result(time_ms / iter, 2.0 * B * M * N * (K + 1));
     }
 
     cudaEventDestroy(start);
