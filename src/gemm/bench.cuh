@@ -8,6 +8,10 @@
 #include <string>
 #include <vector>
 
+#include "buffer.cuh"
+#include "error.cuh"
+#include "event.cuh"
+
 template <typename T, typename AccT = T>
 using gemm_fn = void (*)(const T *, const T *, T *, int, int, int, AccT, AccT);
 
@@ -90,7 +94,7 @@ void bench_cpu(gemm_fn<T, AccT> func,
 
     std::chrono::duration<float, std::milli> duration = stop - start;
     if (result) {
-        result->set_result(duration.count() / iter, 2.0 * M * N * (K + 1));
+        result->set_result(duration.count() / iter, 2.0 * M * N * K);
     }
 }
 
@@ -124,7 +128,7 @@ void bench_cpu(gemmsb_fn<T, AccT> func,
 
     std::chrono::duration<float, std::milli> duration = stop - start;
     if (result) {
-        result->set_result(duration.count() / iter, 2.0 * B * M * N * (K + 1));
+        result->set_result(duration.count() / iter, 2.0 * B * M * N * K);
     }
 }
 
@@ -141,46 +145,37 @@ void bench_cuda(gemm_fn<T, AccT> func,
     std::vector<T> c(M * N, 0.0f);
     AccT alpha = 1.0f, beta = 0.0f;
 
-    T *_a, *_b, *_c;
-    cudaMalloc(&_a, M * K * sizeof(T));
-    cudaMalloc(&_b, K * N * sizeof(T));
-    cudaMalloc(&_c, M * N * sizeof(T));
+    DeviceBuffer<T> _a(M * K);
+    DeviceBuffer<T> _b(K * N);
+    DeviceBuffer<T> _c(M * N);
 
-    cudaMemcpy(_a, a.data(), M * K * sizeof(T), cudaMemcpyDefault);
-    cudaMemcpy(_b, b.data(), K * N * sizeof(T), cudaMemcpyDefault);
-    cudaMemset(_c, 0, M * N * sizeof(T));
+    CUDA_CHECK(cudaMemcpy(_a.data(), a.data(), _a.nbytes(), cudaMemcpyDefault));
+    CUDA_CHECK(cudaMemcpy(_b.data(), b.data(), _b.nbytes(), cudaMemcpyDefault));
+    CUDA_CHECK(cudaMemset(_c.data(), 0, _c.nbytes()));
 
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    CudaEvent start, stop;
 
     // Warm up
-    func(_a, _b, _c, M, N, K, alpha, beta);
-    cudaDeviceSynchronize();
+    func(_a.data(), _b.data(), _c.data(), M, N, K, alpha, beta);
+    CUDA_CHECK(cudaDeviceSynchronize());
 
-    cudaEventRecord(start);
+    start.record();
     for (int i = 0; i < iter; i++) {
-        func(_a, _b, _c, M, N, K, alpha, beta);
+        func(_a.data(), _b.data(), _c.data(), M, N, K, alpha, beta);
     }
-    cudaEventRecord(stop);
-    cudaDeviceSynchronize();
+    stop.record();
+    stop.synchronize();
 
-    cudaMemcpy(c.data(), _c, M * N * sizeof(T), cudaMemcpyDefault);
+    CUDA_CHECK(
+        cudaMemcpy(c.data(), _c.data(), M * N * sizeof(T), cudaMemcpyDefault));
 
     if (result) {
-        float time_ms;
-        cudaEventElapsedTime(&time_ms, start, stop);
-        result->set_result(time_ms / iter, 2.0 * M * N * (K + 1));
+        float time_ms = CudaEvent::elapsed_time(start, stop);
+        result->set_result(time_ms / iter, 2.0 * M * N * K);
     }
-
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
-    cudaFree(_a);
-    cudaFree(_b);
-    cudaFree(_c);
 }
 
-template <typename T, typename AccT>
+template <typename T, typename AccT = T>
 void bench_cuda(gemmsb_fn<T, AccT> func,
                 const int B,
                 const int M,
@@ -197,42 +192,34 @@ void bench_cuda(gemmsb_fn<T, AccT> func,
     std::vector<T> c(B * M * N, 0.0f);
     AccT alpha = 1.0f, beta = 0.0f;
 
-    T *_a, *_b, *_c;
-    cudaMalloc(&_a, B * M * K * sizeof(T));
-    cudaMalloc(&_b, B * K * N * sizeof(T));
-    cudaMalloc(&_c, B * M * N * sizeof(T));
+    DeviceBuffer<T> _a(B * M * K);
+    DeviceBuffer<T> _b(B * K * N);
+    DeviceBuffer<T> _c(B * M * N);
 
-    cudaMemcpy(_a, a.data(), B * M * K * sizeof(T), cudaMemcpyDefault);
-    cudaMemcpy(_b, b.data(), B * K * N * sizeof(T), cudaMemcpyDefault);
-    cudaMemset(_c, 0, B * M * N * sizeof(T));
+    CUDA_CHECK(cudaMemcpy(_a.data(), a.data(), _a.nbytes(), cudaMemcpyDefault));
+    CUDA_CHECK(cudaMemcpy(_b.data(), b.data(), _b.nbytes(), cudaMemcpyDefault));
+    CUDA_CHECK(cudaMemset(_c.data(), 0, _c.nbytes()));
 
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    CudaEvent start, stop;
 
     // Warm up
-    func(_a, _b, _c, B, M, N, K, str_a, str_b, str_c, alpha, beta);
-    cudaDeviceSynchronize();
+    func(_a.data(), _b.data(), _c.data(), B, M, N, K, str_a, str_b, str_c,
+         alpha, beta);
+    CUDA_CHECK(cudaDeviceSynchronize());
 
-    cudaEventRecord(start);
+    start.record();
     for (int i = 0; i < iter; i++) {
-        func(_a, _b, _c, B, M, N, K, str_a, str_b, str_c, alpha, beta);
+        func(_a.data(), _b.data(), _c.data(), B, M, N, K, str_a, str_b, str_c,
+             alpha, beta);
     }
-    cudaEventRecord(stop);
-    cudaDeviceSynchronize();
+    stop.record();
+    stop.synchronize();
 
-    cudaMemcpy(c.data(), _c, B * M * N * (K + 1) * sizeof(T),
-               cudaMemcpyDeviceToHost);
+    CUDA_CHECK(cudaMemcpy(c.data(), _c.data(), B * M * N * sizeof(T),
+                          cudaMemcpyDefault));
 
     if (result) {
-        float time_ms;
-        cudaEventElapsedTime(&time_ms, start, stop);
-        result->set_result(time_ms / iter, 2.0 * B * M * N * (K + 1));
+        float time_ms = CudaEvent::elapsed_time(start, stop);
+        result->set_result(time_ms / iter, 2.0 * B * M * N * K);
     }
-
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
-    cudaFree(_a);
-    cudaFree(_b);
-    cudaFree(_c);
 }
