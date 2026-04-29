@@ -1,81 +1,93 @@
-#include <fstream>
 #include <iostream>
-#include <utility>
+#include <vector>
 
-#include "bench.cuh"
+#include <cuda_runtime.h>
+
+#include "common/bench.cuh"
+#include "common/buffer.cuh"
 #include "kernels/gemm_coalescing.cuh"
-#include "kernels/gemm_cpu.hpp"
 #include "kernels/gemm_naive.cuh"
 #include "kernels/gemm_shared_mem.cuh"
-#include "kernels/gemmsb_cpu.hpp"
 #include "kernels/sgemm_cublas.cuh"
 #include "kernels/sgemmsb_cublas.cuh"
 
-void bench_gemm(const int M,
+void bench_gemm(const int B,
+                const int M,
                 const int N,
                 const int K,
-                const int iter = 10,
+                const int iters = 10,
                 const std::string &filename = "result.csv")
 {
-    static std::pair<std::string, gemm_fn<float>> func[] = {
-        {"GEMM.Naive", gemm_naive<float>},
-        {"GEMM.Coalesced", gemm_coalescing<float>},
-        {"GEMM.SharedMem", gemm_shared_mem<float>},
-        {"GEMM.cuBLAS", sgemm_cublas},
-    };
-    static std::pair<std::string, gemmsb_fn<float>> func2[] = {
-        {"GEMMSB.cuBLAS", sgemmsb_cublas},
-    };
+    std::cout << "============================\n";
+    std::printf("B=%d, M=%d, N=%d, K=%d\n", B, M, N, K);
 
-    std::printf("GEMM Optimization Benchmark: M=%d, N=%d, K=%d\n", M, N, K);
+    std::vector<float> a(B * M * K, 1.1f);
+    std::vector<float> b(B * K * N, 2.2f);
+    std::vector<float> c(B * M * N, 0.0f);
+    float alpha = 1.0f, beta = 0.0f;
+
+    DeviceBuffer<float> _a(B * M * K);
+    DeviceBuffer<float> _b(B * K * N);
+    DeviceBuffer<float> _c(B * M * N);
+
+    CUDA_CHECK(cudaMemcpy(_a.data(), a.data(), _a.nbytes(), cudaMemcpyDefault));
+    CUDA_CHECK(cudaMemcpy(_b.data(), b.data(), _b.nbytes(), cudaMemcpyDefault));
+    CUDA_CHECK(cudaMemset(_c.data(), 0, _c.nbytes()));
+
+    uint64_t num_ops = 2ULL * B * M * N * K;
     BenchmarkResult res;
-    std::ofstream file(filename);
-    file << "name,time(ms),perf(GFLOPS)" << std::endl;
 
-    for (const auto &fn : func) {
-        bench_cuda<float>(fn.second, M, N, K, iter, &res);
-        res.name = fn.first;
-        std::cout << res << std::endl;
-        file << fn.first << "," << res.time_ms << "," << res.gflops << "\n";
-    }
-
-    for (const auto &fn : func2) {
-        bench_cuda<float>(fn.second, 100, M, N, K, M * K, K * N, M * N, iter,
-                          &res);
-        res.name = fn.first;
-        std::cout << res << std::endl;
-        file << fn.first << "," << res.time_ms << "," << res.gflops << "\n";
-    }
-
-    auto fn = std::pair{"GEMM.CPU", gemm_cpu<float>};
-    bench_cpu<float>(fn.second, M, N, K, iter, &res);
-    res.name = fn.first;
+    res = bench("gemm.naive", iters, num_ops, [&]() {
+        for (int i = 0; i < B; i++) {
+            gemm_naive<float>(_a.data(), _b.data(), _c.data(), M, N, K, alpha,
+                              beta);
+        }
+    });
     std::cout << res << std::endl;
-    file << fn.first << "," << res.time_ms << "," << res.gflops << "\n";
 
-    auto fn2 = std::pair{"GEMMSB.CPU", gemmsb_cpu<float>};
-    bench_cpu<float>(fn2.second, 1, M, N, K, M * K, K * N, M * N, iter, &res);
-    res.name = fn2.first;
+    res = bench("gemm.coalesced", iters, num_ops, [&]() {
+        for (int i = 0; i < B; i++) {
+            gemm_coalescing<float>(_a.data(), _b.data(), _c.data(), M, N, K,
+                                   alpha, beta);
+        }
+    });
     std::cout << res << std::endl;
-    file << fn2.first << "," << res.time_ms << "," << res.gflops << "\n";
+
+    res = bench("gemm.shared_mem", iters, num_ops, [&]() {
+        for (int i = 0; i < B; i++) {
+            gemm_shared_mem<float>(_a.data(), _b.data(), _c.data(), M, N, K,
+                                   alpha, beta);
+        }
+    });
+    std::cout << res << std::endl;
+
+    res = bench("gemm.cublas", iters, num_ops, [&]() {
+        for (int i = 0; i < B; i++) {
+            sgemm_cublas(_a.data(), _b.data(), _c.data(), M, N, K, alpha, beta);
+        }
+    });
+    std::cout << res << std::endl;
+
+    res = bench("gemmsb.cublas", iters, num_ops, sgemmsb_cublas, _a.data(),
+                _b.data(), _c.data(), B, M, N, K, M * K, K * N, M * N, alpha,
+                beta);
+    std::cout << res << std::endl;
+
+
+    CUDA_CHECK(cudaMemcpy(c.data(), _c.data(), _c.nbytes(), cudaMemcpyDefault));
+    std::cout << "============================\n";
 }
 
 int main()
 {
-    std::cout << "========[base]========" << std::endl;
-    bench_gemm(1024, 1024, 1024, 10, "data/base_1024_1024_1024.csv");
+    int batch = 10;
+    int iters = 10;
 
-    std::cout << "========[qkv]========" << std::endl;
-    bench_gemm(197, 1152, 384, 10, "data/qkv_197_1152_384.csv");
-
-    std::cout << "========[out]========" << std::endl;
-    bench_gemm(197, 384, 384, 10, "data/out_197_384_384.csv");
-
-    std::cout << "========[fc1]========" << std::endl;
-    bench_gemm(197, 1536, 384, 10, "data/fc1_197_1536_384.csv");
-
-    std::cout << "========[fc2]========" << std::endl;
-    bench_gemm(197, 384, 1536, 10, "data/fc2_197_384_1536.csv");
+    bench_gemm(batch, 1024, 1024, 1024, iters, "data/tmp_1024_1024_1024.csv");
+    bench_gemm(batch, 197, 1152, 384, iters, "data/qkv_197_1152_384.csv");
+    bench_gemm(batch, 197, 384, 384, iters, "data/out_197_384_384.csv");
+    bench_gemm(batch, 197, 1536, 384, iters, "data/fc1_197_1536_384.csv");
+    bench_gemm(batch, 197, 384, 1536, iters, "data/fc2_197_384_1536.csv");
 
     return 0;
 }

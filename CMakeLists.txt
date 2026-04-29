@@ -29,5 +29,5 @@ target_link_libraries(blur ${OpenCV_LIBS})
 
 add_executable(gemm src/gemm/main.cu)
 target_include_directories(gemm PRIVATE src/gemm)
-target_include_directories(gemm PRIVATE src/common)
+target_include_directories(gemm PRIVATE src)
 target_link_libraries(gemm PRIVATE CUDA::cublas)
